@@ -1,0 +1,14 @@
+*.json
+*.csv.gz
+*.csv.bz2
+*.parquet
+.idea
+*.tfstate
+*.tfstate.*
+**.terraform
+**.terraform.lock.*
+.history
+terraform.tfvars
+**.env
+**__pycache__/
+.ipynb_checkpoints
