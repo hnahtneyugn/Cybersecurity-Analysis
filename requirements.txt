@@ -1,0 +1,4 @@
+tensorflow
+google-cloud-bigquery
+google-cloud-pubsub
+numpy

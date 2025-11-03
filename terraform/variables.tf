@@ -23,8 +23,37 @@ variable "gcs_bucket_name" {
   type        = string
 }
 
+variable "gcs_object_name" {
+  description = "GCS Object Name"
+  type = string
+}
+
+variable "vm_name" {
+  description = "VM instance Name" 
+  type = string
+}
+
+variable "pubsub_topic_name" {
+  description = "PubSub Topic Name"
+  type = string
+}
+
+variable "cloudrun_name" {
+  description = "Cloud Run Function Name"
+  type = string
+}
+
 variable "bq_dataset_name" {
   description = "My BigQuery Dataset Name"
   type        = string
 }
 
+variable "bq_table_name" {
+  description = "My BigQuery Table Name"
+  type = string
+}
+
+variable "bq_table_schema" {
+  description = "Schema for BigQuery table"
+  type = string
+}

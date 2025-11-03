@@ -13,3 +13,6 @@ terraform.tfvars
 **__pycache__/
 .ipynb_checkpoints
 .DS_Store
+.zip
+.keras
+.pkl
