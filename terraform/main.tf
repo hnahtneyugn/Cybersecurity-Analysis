@@ -67,27 +67,44 @@ resource "google_compute_instance" "terraform_vm" {
     #!/bin/bash
     set -e
 
-    # Update and install system dependencies
+    # Update system
     apt-get update -y
-    apt-get install -y python3-pip python3-venv ca-certificates wget
+    apt-get install -y python3-pip python3-venv ca-certificates curl gnupg lsb-release wget
 
-    # Create Python virtual environment
+    # Install Docker
+    install -m 0755 -d /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    echo \
+      "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
+      https://download.docker.com/linux/debian \
+      $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+    apt-get update -y
+    apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+    systemctl enable docker
+    systemctl start docker
+
+    # Run certstream-server-go container
+    docker run -d \
+      --name certstream-server \
+      -p 8080:8080 \
+      ghcr.io/d-rickyy-b/certstream-server-go:latest
+
+    # Python virtual environment
     python3 -m venv /home/certstream_env
-
-    # Activate venv and upgrade pip
     source /home/certstream_env/bin/activate
     pip install --upgrade pip
-
-    # Install required Python packages inside venv
     pip install certstream websocket-client google-cloud-pubsub
 
     # Copy the producer script from GCS
     gsutil cp gs://${var.gcs_bucket_name}/producer.py /home/producer.py
 
-    # Set PROJECT_ID environment variable
+    # Set PROJECT_ID
     export PROJECT_ID="${var.project}"
 
-    # Run the producer in background using venv Python
+    # Wait for certstream server to start
+    sleep 10
+
+    # Run producer in background
     nohup /home/certstream_env/bin/python -u /home/producer.py > /home/producer.log 2>&1 &
   EOT
 }

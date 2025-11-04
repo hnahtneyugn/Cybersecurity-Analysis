@@ -3,6 +3,8 @@ import os
 import time
 import atexit
 import certstream
+import threading
+import websocket
 from itertools import count
 from google.cloud import pubsub_v1
 from google.cloud.pubsub_v1.types import (
@@ -14,6 +16,7 @@ from google.cloud.pubsub_v1.types import (
 # GCP Project details
 PROJECT_ID = os.environ.get("PROJECT_ID", "hip-host-475008-d5")
 TOPIC_ID = "urlstream"
+PING_INTERVAL = 30 
 
 counter = count()
 
@@ -49,7 +52,6 @@ def on_publish_done(future):
 
 # Certstream message handler
 def on_message(message, _):
-    print("Got Certstream message!", flush=True)
     if message.get("message_type") != "certificate_update":
         return
     try:
@@ -68,6 +70,20 @@ def on_message(message, _):
     except Exception as e:
         print(f"Error in on_message: {e}", flush=True)
 
+
+# Ping the server every 30s
+def start_pinger(ws_url):
+    def ping_loop():
+        while True:
+            try:
+                ws = websocket.create_connection(ws_url)
+                ws.ping()
+                ws.close()
+            except Exception:
+                pass
+            time.sleep(PING_INTERVAL)
+    threading.Thread(target=ping_loop, daemon=True).start()
+
 # Flush publisher on exit
 @atexit.register
 def flush_pubsub():
@@ -76,4 +92,6 @@ def flush_pubsub():
 
 # Start Certstream listener
 print(f"Starting Certstream producer (target: {TARGET_RATE} certs/sec)...", flush=True)
-certstream.listen_for_events(on_message, url="wss://certstream.calidog.io/")
+ws_url = "ws://localhost:8080/"
+start_pinger(ws_url)
+certstream.listen_for_events(message_callback=on_message, url=ws_url)
