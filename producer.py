@@ -2,7 +2,6 @@ import json
 import os
 import time
 import atexit
-import certstream
 import threading
 import websocket
 from itertools import count
@@ -16,6 +15,7 @@ from google.cloud.pubsub_v1.types import (
 # GCP Project details
 PROJECT_ID = os.environ.get("PROJECT_ID", "hip-host-475008-d5")
 TOPIC_ID = "urlstream"
+WS_URL = "ws://localhost:8080/"
 PING_INTERVAL = 30 
 
 counter = count()
@@ -46,16 +46,19 @@ SLEEP_BETWEEN_BATCHES = 1.0 / TARGET_RATE
 # Callback for async publish
 def on_publish_done(future):
     try:
-        message_id = future.result()
+        future.result()
     except Exception as e:
         print(f"Publish failed: {e}", flush=True)
 
 # Certstream message handler
-def on_message(message, _):
-    if message.get("message_type") != "certificate_update":
-        return
+def handle_cert_message(message):
+    """Parse a Certstream message and push to Pub/Sub."""
     try:
-        all_domains = message["data"]["leaf_cert"]["all_domains"]
+        msg = json.loads(message)
+        if msg.get("message_type") != "certificate_update":
+            return
+
+        all_domains = msg["data"]["leaf_cert"]["all_domains"]
         data = json.dumps({"urls": all_domains}).encode("utf-8")
 
         future = publisher.publish(topic_path, data)
@@ -65,24 +68,52 @@ def on_message(message, _):
         if n % 50 == 0:
             print(f"Published {n} cert batches", flush=True)
 
-        time.sleep(SLEEP_BETWEEN_BATCHES)  # maintain target rate
+        time.sleep(SLEEP_BETWEEN_BATCHES)
 
     except Exception as e:
-        print(f"Error in on_message: {e}", flush=True)
+        print(f"Error handling message: {e}", flush=True)
 
 
-# Ping the server every 30s
-def start_pinger(ws_url):
-    def ping_loop():
-        while True:
-            try:
-                ws = websocket.create_connection(ws_url)
-                ws.ping()
-                ws.close()
-            except Exception:
-                pass
-            time.sleep(PING_INTERVAL)
-    threading.Thread(target=ping_loop, daemon=True).start()
+
+# Use Websocket to run Certstream
+def run_websocket():
+    def on_open(ws):
+        print("Connection established to Certstream server.", flush=True)
+
+        def ping_loop():
+            while True:
+                try:
+                    ws.send("ping")
+                    print("Sent ping", flush=True)
+                except Exception as e:
+                    print(f"Ping failed: {e}", flush=True)
+                    break
+                time.sleep(PING_INTERVAL)
+
+        threading.Thread(target=ping_loop, daemon=True).start()
+
+    def on_message(ws, message):
+        handle_cert_message(message)
+
+    def on_error(ws, error):
+        print(f"[!] WebSocket error: {error}", flush=True)
+
+    def on_close(ws, close_status_code, close_msg):
+        print(f"[!] WebSocket closed ({close_status_code}): {close_msg}", flush=True)
+
+    while True:
+        try:
+            ws = websocket.WebSocketApp(
+                WS_URL,
+                on_open=on_open,
+                on_message=on_message,
+                on_error=on_error,
+                on_close=on_close,
+            )
+            ws.run_forever(ping_interval=None, ping_timeout=None)
+        except Exception as e:
+            print(f"Connection failed: {e}. Retrying in 5s...", flush=True)
+            time.sleep(5)
 
 # Flush publisher on exit
 @atexit.register
@@ -91,7 +122,6 @@ def flush_pubsub():
     publisher.stop()
 
 # Start Certstream listener
-print(f"Starting Certstream producer (target: {TARGET_RATE} certs/sec)...", flush=True)
-ws_url = "ws://localhost:8080/"
-start_pinger(ws_url)
-certstream.listen_for_events(message_callback=on_message, url=ws_url)
+if __name__ == "__main__":
+    print(f"Starting Certstream producer (target: {TARGET_RATE} certs/sec)...", flush=True)
+    run_websocket()

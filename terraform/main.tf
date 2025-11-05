@@ -85,6 +85,7 @@ resource "google_compute_instance" "terraform_vm" {
 
     # Run certstream-server-go container
     docker run -d \
+      --restart always \
       --name certstream-server \
       -p 8080:8080 \
       ghcr.io/d-rickyy-b/certstream-server-go:latest
@@ -93,7 +94,7 @@ resource "google_compute_instance" "terraform_vm" {
     python3 -m venv /home/certstream_env
     source /home/certstream_env/bin/activate
     pip install --upgrade pip
-    pip install certstream websocket-client google-cloud-pubsub
+    pip install websocket-client google-cloud-pubsub
 
     # Copy the producer script from GCS
     gsutil cp gs://${var.gcs_bucket_name}/producer.py /home/producer.py
