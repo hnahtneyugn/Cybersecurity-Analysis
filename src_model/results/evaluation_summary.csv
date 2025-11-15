@@ -1,0 +1,8 @@
+Category,Count
+Tổng Số Mẫu,1394018
+URL Sạch (Thực Tế),697009
+URL Độc Hại (Thực Tế),697009
+True Positives,678482
+True Negatives,691309
+False Positives,5700
+False Negatives,18527
