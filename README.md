@@ -154,6 +154,8 @@ Kết quả đường cong học (Hình 6, trang 22) cho thấy train/val loss h
 - Terraform / gcloud CLI để triển khai IaC.
 - Docker & Go để chạy Certstream server (Go).
 
+## Kết quả dự án được trình bày ở : [Dashboard Dự án] (https://dashboard-cloud-938296883293.us-central1.run.app/)
+
 ## Giới thiệu thành viên 
 
 - **Đào Tự Phát** – MSSV: `23020409`  
