@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>URL Security Intelligence Dashboard</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://code.highcharts.com/highcharts.js"></script>
+    <script src="https://code.highcharts.com/highcharts-more.js"></script>
+    <script src="https://code.highcharts.com/modules/solid-gauge.js"></script>
+    <script src="https://code.highcharts.com/modules/exporting.js"></script>
+    
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container { max-width: 1800px; margin: 0 auto; }
+
+        /* Header */
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+            padding: 30px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            font-size: 2.8em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .header .live-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            background: #2ecc71;
+            border-radius: 50%;
+            margin-right: 8px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            transition: transform 0.3s, box-shadow 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.15);
+        }
+
+        .stat-card h3 {
+            font-size: 0.85em;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+        }
+
+        .stat-card .value {
+            font-size: 2.2em;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+
+        .stat-card .label {
+            font-size: 0.85em;
+            color: #999;
+        }
+
+        .stat-card.danger .value { color: #e74c3c; }
+        .stat-card.success .value { color: #2ecc71; }
+        .stat-card.warning .value { color: #f39c12; }
+
+        /* Charts Grid */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .chart-box {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+
+        .chart-box.span-2 { grid-column: span 2; }
+        .chart-box.span-3 { grid-column: span 3; }
+
+        .chart-title {
+            font-size: 1.3em;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #333;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* Table Section */
+        .table-section {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .table-container {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+
+        .table-wrapper {
+            max-height: 500px;
+            overflow-y: auto;
+            margin-top: 15px;
+        }
+
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
+        th {
+            background: #f8f9fa;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            font-weight: 600;
+            color: #667eea;
+        }
+        tr:hover { background: #f8f9fa; }
+
+        .url-cell {
+            max-width: 400px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .badge {
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 600;
+            display: inline-block;
+        }
+
+        .badge.danger { background: #fee; color: #e74c3c; }
+        .badge.success { background: #efe; color: #2ecc71; }
+
+        .confidence-bar {
+            height: 8px;
+            background: #eee;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+
+        .confidence-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            transition: width 0.3s;
+        }
+
+        .new-row {
+            animation: slideIn 0.5s ease-out;
+            background: #e6f7ff !important;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+
+        /* Feature Grid */
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+        }
+
+        /* Responsive */
+        @media (max-width: 1400px) {
+            .charts-grid { grid-template-columns: repeat(2, 1fr); }
+            .chart-box.span-2 { grid-column: span 1; }
+        }
+
+        @media (max-width: 1000px) {
+            .charts-grid { grid-template-columns: 1fr; }
+            .table-section { grid-template-columns: 1fr; }
+            .feature-grid { grid-template-columns: 1fr; }
+        }
+
+        @media (max-width: 768px) {
+            .header h1 { font-size: 1.8em; }
+            .stats-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>🛡️ URL Security Intelligence Dashboard</h1>
+            <p><span class="live-indicator"></span>Real-time Phishing Detection & Advanced Analytics</p>
+        </div>
+
+        <!-- Stats Cards -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3>📊 Total Analysis</h3>
+                <div class="value" id="stat-total">-</div>
+                <div class="label">All time URLs</div>
+            </div>
+            <div class="stat-card danger">
+                <h3>⚠️ Malicious</h3>
+                <div class="value" id="stat-malicious">-</div>
+                <div class="label"><span id="stat-malicious-rate">0</span>% detection rate</div>
+            </div>
+            <div class="stat-card success">
+                <h3>✅ Benign</h3>
+                <div class="value" id="stat-benign">-</div>
+                <div class="label"><span id="stat-benign-rate">0</span>% safe URLs</div>
+            </div>
+            <div class="stat-card">
+                <h3>🎯 Mean Score</h3>
+                <div class="value" id="stat-confidence">-</div>
+                <div class="label">Model confidence</div>
+            </div>
+            <div class="stat-card warning">
+                <h3>⚡ Last Hour</h3>
+                <div class="value" id="stat-last-hour">-</div>
+                <div class="label">Real-time activity</div>
+            </div>
+            <div class="stat-card">
+                <h3>🔍 Latest Detection</h3>
+                <div class="value" id="stat-latest" style="font-size: 1.5em;">-</div>
+                <div class="label">Time ago</div>
+            </div>
+        </div>
+
+        <!-- Main Charts -->
+        <div class="charts-grid">
+            <div class="chart-box">
+                <div class="chart-title">📊 Classification Overview</div>
+                <div id="pie-chart" style="height: 300px;"></div>
+            </div>
+            
+            <div class="chart-box">
+                <div class="chart-title">🎯 Mean Confidence Score</div>
+                <div id="gauge-chart" style="height: 300px;"></div>
+            </div>
+
+            <div class="chart-box">
+                <div class="chart-title">📈 Confidence Distribution</div>
+                <div id="confidence-chart" style="height: 300px;"></div>
+            </div>
+            
+            <div class="chart-box span-3">
+                <div class="chart-title">⏱️ Detection Timeline (30 Minutes)</div>
+                <div id="timeline-chart" style="height: 350px;"></div>
+            </div>
+            
+            <div class="chart-box span-2">
+                <div class="chart-title">📉 Detection Rate Trend (7 Days)</div>
+                <div id="detection-rate-chart" style="height: 300px;"></div>
+            </div>
+
+            <div class="chart-box">
+                <div class="chart-title">⚠️ False Positive Analysis</div>
+                <div id="false-positive-chart" style="height: 300px;"></div>
+            </div>
+
+            <div class="chart-box span-2">
+                <div class="chart-title">🌐 Top Malicious Domains</div>
+                <div id="domains-chart" style="height: 400px;"></div>
+            </div>
+
+            <div class="chart-box">
+                <div class="chart-title">📏 URL Length Analysis</div>
+                <div id="length-chart" style="height: 400px;"></div>
+            </div>
+        </div>
+
+        <!-- Tables -->
+        <div class="table-section">
+            <div class="table-container">
+                <div class="chart-title">📋 Recent Detections</div>
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>URL</th>
+                                <th>Status</th>
+                                <th>Confidence</th>
+                                <th>Time</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recent-table">
+                            <tr><td colspan="4" class="loading">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <div class="chart-title">⚠️ Top Threats</div>
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>URL</th>
+                                <th>Confidence</th>
+                            </tr>
+                        </thead>
+                        <tbody id="malicious-table">
+                            <tr><td colspan="2" class="loading">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let charts = {};
+        let currentTotalURLs = 0;
+        let currentTotals = {"0": 0, "1": 0};
+        let currentScoreSums = {"0": 0.0, "1": 0.0};
+
+        // Utility Functions
+        function formatTime(timestamp) {
+            if (!timestamp) return '-';
+            const date = new Date(timestamp);
+            return date.toLocaleTimeString('vi-VN', {hour: '2-digit', minute: '2-digit'});
+        }
+
+        function timeAgo(timestamp) {
+            if (!timestamp) return '-';
+            const seconds = Math.floor((new Date() - new Date(timestamp)) / 1000);
+            if (seconds < 60) return seconds + 's ago';
+            if (seconds < 3600) return Math.floor(seconds / 60) + 'm ago';
+            if (seconds < 86400) return Math.floor(seconds / 3600) + 'h ago';
+            return Math.floor(seconds / 86400) + 'd ago';
+        }
+
+        function formatConfidence(confidence) {
+            return (confidence * 100).toFixed(1) + '%';
+        }
+
+        function createBadge(isPhishing) {
+            return isPhishing === 1 
+                ? '<span class="badge danger">⚠️ MALICIOUS</span>'
+                : '<span class="badge success">✓ BENIGN</span>';
+        }
+
+        function createConfidenceBar(confidence) {
+            const percentage = (confidence * 100).toFixed(1);
+            return `
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="min-width: 45px;">${percentage}%</span>
+                    <div class="confidence-bar" style="flex: 1;">
+                        <div class="confidence-fill" style="width: ${percentage}%;"></div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Load Stats
+        function loadStats() {
+            fetch('/api/stats')
+                .then(r => r.json())
+                .then(data => {
+                    currentTotalURLs = data.total_urls;
+                    currentScoreSums["1"] = data.avg_malicious_confidence * data.total_malicious;
+                    currentScoreSums["0"] = data.avg_benign_confidence * data.total_benign;
+
+                    document.getElementById('stat-total').textContent = data.total_urls.toLocaleString();
+                    document.getElementById('stat-malicious').textContent = data.total_malicious.toLocaleString();
+                    document.getElementById('stat-benign').textContent = data.total_benign.toLocaleString();
+                    document.getElementById('stat-malicious-rate').textContent = data.malicious_rate;
+                    document.getElementById('stat-benign-rate').textContent = data.benign_rate;
+                    
+                    const avgConf = ((data.avg_malicious_confidence + data.avg_benign_confidence) / 2 * 100).toFixed(1);
+                    document.getElementById('stat-confidence').textContent = avgConf;
+                });
+
+            fetch('/api/realtime-metrics')
+                .then(r => r.json())
+                .then(data => {
+                    document.getElementById('stat-last-hour').textContent = data.total_last_hour.toLocaleString();
+                    document.getElementById('stat-latest').textContent = timeAgo(data.latest_detection);
+                });
+        }
+
+        // Pie Chart
+        function loadPieChart() {
+            fetch('/api/stats') 
+                .then(r => r.json())
+                .then(data => {
+                    currentTotals["0"] = data.total_benign || 0;
+                    currentTotals["1"] = data.total_malicious || 0;
+
+                    charts.pie = Highcharts.chart('pie-chart', {
+                        chart: { type: 'pie', backgroundColor: 'transparent' },
+                        title: { text: '' },
+                        tooltip: { pointFormat: '<b>{point.percentage:.1f}%</b><br/>Count: {point.y:,.0f}' },
+                        plotOptions: {
+                            pie: {
+                                allowPointSelect: true,
+                                cursor: 'pointer',
+                                dataLabels: {
+                                    enabled: true,
+                                    format: '<b>{point.name}</b><br/>{point.percentage:.1f}%'
+                                }
+                            }
+                        },
+                        colors: ['#2ecc71', '#e74c3c'],
+                        series: [{
+                            name: 'URLs',
+                            data: [
+                                { name: 'Benign', y: data.total_benign || 0 },
+                                { name: 'Malicious', y: data.total_malicious || 0 }
+                            ]
+                        }]
+                    });
+                });
+        }
+
+        // Gauge Chart
+        function loadGaugeChart() {
+            fetch('/api/stats')
+                .then(r => r.json())
+                .then(data => {
+                    const avgConf = ((data.avg_malicious_confidence + data.avg_benign_confidence) / 2 * 100);
+                    charts.gauge = Highcharts.chart('gauge-chart', {
+                        chart: { type: 'solidgauge', backgroundColor: 'transparent' },
+                        title: { text: '' },
+                        pane: {
+                            startAngle: -90,
+                            endAngle: 90,
+                            background: {
+                                backgroundColor: '#EEE',
+                                innerRadius: '60%',
+                                outerRadius: '100%',
+                                shape: 'arc'
+                            }
+                        },
+                        yAxis: {
+                            min: 0,
+                            max: 100,
+                            stops: [
+                                [0.3, '#e74c3c'],
+                                [0.5, '#f39c12'],
+                                [0.7, '#2ecc71']
+                            ],
+                            lineWidth: 0,
+                            tickWidth: 0,
+                            minorTickInterval: null,
+                            labels: { y: 16 }
+                        },
+                        credits: { enabled: false },
+                        series: [{
+                            name: 'Score',
+                            data: [avgConf],
+                            dataLabels: {
+                                format: '<div style="text-align:center">' +
+                                    '<span style="font-size:25px">{y:.1f}%</span><br/>' +
+                                    '<span style="font-size:12px;opacity:0.6">Score</span>' +
+                                    '</div>'
+                            }
+                        }]
+                    });
+                });
+        }
+
+
+        // Confidence Distribution
+        function loadConfidenceChart() {
+            fetch('/api/confidence-distribution')
+                .then(r => r.json())
+                .then(data => {
+                    const ranges = ['0.9-1.0', '0.7-0.9', '0.5-0.7', '0.3-0.5', '0.1-0.3', '0.0-0.1'];
+                    const benign = {}, malicious = {};
+                    ranges.forEach(r => { benign[r] = 0; malicious[r] = 0; });
+                    data.forEach(item => {
+                        (item.classification === 0 ? benign : malicious)[item.confidence_range] = item.count;
+                    });
+
+                    charts.confidence = Highcharts.chart('confidence-chart', {
+                        chart: { type: 'column', backgroundColor: 'transparent' },
+                        title: { text: '' },
+                        xAxis: { categories: ranges, title: { text: 'Confidence Score Range' } },
+                        yAxis: { title: { text: 'Count' }, min: 0 },
+                        tooltip: { valueSuffix: ' URLs' },
+                        plotOptions: { column: { stacking: 'normal' } },
+                        colors: ['#2ecc71', '#e74c3c'],
+                        series: [
+                            { name: 'Benign', data: ranges.map(r => benign[r]) },
+                            { name: 'Malicious', data: ranges.map(r => malicious[r]) }
+                        ]
+                    });
+                });
+        }
+        
+        // Timeline Chart
+        function loadTimelineChart() {
+            fetch('/api/timeline')
+                .then(r => r.json())
+                .then(data => {
+                    const grouped = {};
+                    data.forEach(item => {
+                        if (!grouped[item.time_bucket]) grouped[item.time_bucket] = {benign: 0, malicious: 0};
+                        grouped[item.time_bucket][item.classification === 0 ? 'benign' : 'malicious'] = item.count;
+                    });
+
+                    const categories = Object.keys(grouped).sort().map(h => 
+                        new Date(h).toLocaleTimeString('vi-VN', {hour: '2-digit', minute: '2-digit'})
+                    );
+                    const benignData = Object.keys(grouped).sort().map(h => grouped[h].benign);
+                    const maliciousData = Object.keys(grouped).sort().map(h => grouped[h].malicious);
+
+                    charts.timeline = Highcharts.chart('timeline-chart', {
+                        chart: { type: 'areaspline', backgroundColor: 'transparent' },
+                        title: { text: '' },
+                        xAxis: { categories, title: { text: 'Time (Last 30 Minutes)' } },
+                        yAxis: { title: { text: 'URLs' }, min: 0 },
+                        tooltip: { shared: true, valueSuffix: ' URLs' },
+                        plotOptions: { areaspline: { fillOpacity: 0.5 } },
+                        colors: ['#2ecc71', '#e74c3c'],
+                        series: [
+                            { name: 'Benign', data: benignData },
+                            { name: 'Malicious', data: maliciousData }
+                        ]
+                    });
+                });
+        }
+
+        // Detection Rate
+        function loadDetectionRateChart() {
+            fetch('/api/detection-rate')
+                .then(r => r.json())
+                .then(data => {
+                    charts.detectionRate = Highcharts.chart('detection-rate-chart', {
+                        chart: { type: 'spline', backgroundColor: 'transparent' },
+                        title: { text: '' },
+                        xAxis: {
+                            categories: data.map(d => new Date(d.date).toLocaleDateString('vi-VN'))
+                        },
+                        yAxis: { title: { text: 'Detection Rate (%)' }, min: 0, max: 100 },
+                        tooltip: {
+                            pointFormat: 'Rate: <b>{point.y:.2f}%</b><br/>Total: <b>{point.total}</b> URLs'
+                        },
+                        colors: ['#667eea'],
+                        series: [{
+                            name: 'Detection Rate',
+                            data: data.map(d => ({
+                                y: d.detection_rate,
+                                total: d.total_urls
+                            })),
+                            marker: { enabled: true }
+                        }]
+                    });
+                });
+        }
+
+        // False Positive
+        function loadFalsePositiveChart() {
+            fetch('/api/stats')
+                .then(r => r.json())
+                .then(data => {
+                    charts.falsePositive = Highcharts.chart('false-positive-chart', {
+                        chart: { type: 'pie', backgroundColor: 'transparent' },
+                        title: { text: '' },
+                        tooltip: { pointFormat: '<b>{point.percentage:.1f}%</b><br/>Count: {point.y}' },
+                        plotOptions: {
+                            pie: {
+                                dataLabels: {
+                                    enabled: true,
+                                    format: '<b>{point.name}</b><br/>{point.y}'
+                                }
+                            }
+                        },
+                        colors: ['#2ecc71', '#f39c12', '#e74c3c'],
+                        series: [{
+                            name: 'Analysis',
+                            data: [
+                                { name: 'High Confidence', y: data.total_urls - data.low_confidence_benign - data.low_confidence_malicious },
+                                { name: 'Low Conf Benign', y: data.low_confidence_benign },
+                                { name: 'Low Conf Malicious', y: data.low_confidence_malicious }
+                            ]
+                        }]
+                    });
+                })
+                .catch(err => console.error('Error loading false positive chart:', err));
+        }
+
+        // Top Domains
+        function loadDomainsChart() {
+            fetch('/api/top-domains')
+                .then(r => r.json())
+                .then(data => {
+                    charts.domains = Highcharts.chart('domains-chart', {
+                        chart: { type: 'bar', backgroundColor: 'transparent' },
+                        title: { text: '' },
+                        xAxis: { categories: data.map(d => d.domain), title: { text: null } },
+                        yAxis: { title: { text: 'Count' } },
+                        tooltip: {
+                            pointFormat: 'Count: <b>{point.y}</b><br/>Avg Confidence: <b>{point.confidence:.1f}%</b>'
+                        },
+                        plotOptions: { bar: { dataLabels: { enabled: true } } },
+                        colors: ['#e74c3c'],
+                        series: [{
+                            name: 'Malicious URLs',
+                            data: data.map(d => ({
+                                y: d.count,
+                                confidence: d.avg_confidence * 100
+                            }))
+                        }]
+                    });
+                });
+        }
+
+        // URL Length
+        function loadLengthChart() {
+            fetch('/api/url-length')
+                .then(r => r.json())
+                .then(data => {
+                    const ranges = ['0-30', '30-50', '50-75', '75-100', '100+'];
+                    const benign = {}, malicious = {};
+                    ranges.forEach(r => { benign[r] = 0; malicious[r] = 0; });
+                    data.forEach(item => {
+                        (item.is_phishing === 0 ? benign : malicious)[item.length_range] = item.count;
+                    });
+
+                    charts.length = Highcharts.chart('length-chart', {
+                        chart: { type: 'column', backgroundColor: 'transparent' },
+                        title: { text: '' },
+                        xAxis: { categories: ranges, title: { text: 'Length (chars)' } },
+                        yAxis: { title: { text: 'Count' } },
+                        tooltip: { shared: true },
+                        colors: ['#2ecc71', '#e74c3c'],
+                        series: [
+                            { name: 'Benign', data: ranges.map(r => benign[r]) },
+                            { name: 'Malicious', data: ranges.map(r => malicious[r]) }
+                        ]
+                    });
+                });
+        }
+
+        // Load Tables
+        function loadRecentTable() {
+            fetch('/api/data')
+                .then(r => r.json())
+                .then(data => {
+                    const tbody = document.getElementById('recent-table');
+                    tbody.innerHTML = '';
+                    
+                    if (!data || data.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="4" class="loading">No data available</td></tr>';
+                        return;
+                    }
+                    
+                    data.slice(0, 50).forEach(item => {
+                        const row = tbody.insertRow();
+                        row.innerHTML = `
+                            <td class="url-cell" title="${item.url}">${item.url}</td>
+                            <td>${createBadge(item.classification === 'MALICIOUS' ? 1 : 0)}</td>
+                            <td>${createConfidenceBar(item.score)}</td>
+                            <td>${formatTime(item.time_added)}</td>
+                        `;
+                    });
+                })
+                .catch(err => {
+                    console.error('Error loading recent table:', err);
+                    document.getElementById('recent-table').innerHTML = 
+                        '<tr><td colspan="4" class="loading" style="color: #e74c3c;">Error loading data</td></tr>';
+                });
+        }
+
+        function loadMaliciousTable() {
+            fetch('/api/top-malicious')
+                .then(r => r.json())
+                .then(data => {
+                    const tbody = document.getElementById('malicious-table');
+                    tbody.innerHTML = '';
+                    
+                    if (!data || data.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="2" class="loading">No malicious URLs found</td></tr>';
+                        return;
+                    }
+                    
+                    data.forEach(item => {
+                        const row = tbody.insertRow();
+                        row.innerHTML = `
+                            <td class="url-cell" title="${item.url}">${item.url}</td>
+                            <td>${createConfidenceBar(item.confidence)}</td>
+                        `;
+                    });
+                })
+                .catch(err => {
+                    console.error('Error loading malicious table:', err);
+                    document.getElementById('malicious-table').innerHTML = 
+                        '<tr><td colspan="2" class="loading" style="color: #e74c3c;">Error loading data</td></tr>';
+                });
+        }
+
+        // WebSocket Connection
+        function setupWebSocket() {
+            const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const ws = new WebSocket(`${wsProtocol}//${window.location.host}/ws`);
+
+            ws.onopen = () => {
+                console.log('✅ WebSocket connected!');
+            };
+            
+            ws.onclose = () => {
+                console.log('❌ WebSocket disconnected. Attempting to reconnect...');
+                setTimeout(setupWebSocket, 5000);
+            };
+            
+            ws.onerror = (err) => {
+                console.error('WebSocket error:', err);
+            };
+
+            ws.onmessage = function(event) {
+                try {
+                    const dataArray = JSON.parse(event.data);
+                    if (!Array.isArray(dataArray) || dataArray.length === 0) {
+                        return;
+                    }
+                    console.log(`📥 New BATCH received with ${dataArray.length} items.`);
+
+                    const tbody = document.getElementById('recent-table');
+
+                    for (const data of dataArray) {
+                        if (!data || typeof data.classification === 'undefined') continue;
+                    
+                        const isMalicious = (data.classification === 'MALICIOUS');
+                        const key = isMalicious ? "1" : "0";
+                        const score = parseFloat(data.score) || 0;
+
+                        // Update counts and sums
+                        currentTotalURLs++;
+                        currentTotals[key]++;
+                        currentScoreSums[key] += score;
+
+                        // Add to recent table
+                        const row = tbody.insertRow(0);
+                        row.className = 'new-row';
+                        row.innerHTML = `
+                            <td class="url-cell" title="${data.url}">${data.url}</td>
+                            <td>${createBadge(data.classification === 'MALICIOUS' ? 1 : 0)}</td>
+                            <td>${createConfidenceBar(data.score)}</td>
+                            <td>${formatTime(data.time_added)}</td>
+                        `;
+
+                        // Keep only 50 rows
+                        while (tbody.rows.length > 50) {
+                            tbody.deleteRow(tbody.rows.length - 1);
+                        }
+                    }
+
+                    // Update Stats Cards
+                    document.getElementById('stat-total').textContent = currentTotalURLs.toLocaleString();
+                    document.getElementById('stat-malicious').textContent = currentTotals["1"].toLocaleString();
+                    document.getElementById('stat-benign').textContent = currentTotals["0"].toLocaleString();
+                    
+                    const maliciousRate = (currentTotalURLs > 0 ? (currentTotals["1"] / currentTotalURLs * 100) : 0).toFixed(2);
+                    const benignRate = (currentTotalURLs > 0 ? (currentTotals["0"] / currentTotalURLs * 100) : 0).toFixed(2);
+                    document.getElementById('stat-malicious-rate').textContent = maliciousRate;
+                    document.getElementById('stat-benign-rate').textContent = benignRate;
+                    
+                    // Update Last Hour count
+                    const latestItem = dataArray[dataArray.length - 1];
+                    document.getElementById('stat-latest').textContent = timeAgo(latestItem.time_added);
+                    
+                    // Update Mean Confidence Score
+                    const avgMalicious = (currentTotals["1"] > 0 ? (currentScoreSums["1"] / currentTotals["1"]) : 0);
+                    const avgBenign = (currentTotals["0"] > 0 ? (currentScoreSums["0"] / currentTotals["0"]) : 0);
+                    const avgConf = ((avgMalicious + avgBenign) / 2 * 100).toFixed(1);
+                    document.getElementById('stat-confidence').textContent = avgConf;
+
+                    // Update Pie Charts
+                    if (charts.pie) {
+                        charts.pie.series[0].setData([
+                            { name: 'Benign', y: currentTotals["0"] },
+                            { name: 'Malicious', y: currentTotals["1"] }
+                        ], true, true);
+                    }
+
+                    // Update Gauge Chart
+                    if (charts.gauge) {
+                        charts.gauge.series[0].points[0].update(parseFloat(avgConf));
+                    }
+
+                } catch (err) {
+                    console.error('Error processing WebSocket message:', err);
+                }
+            };
+        }
+
+        // Initialize Dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 Initializing dashboard...');
+            
+            // Load all data
+            loadStats();
+            loadPieChart();
+            loadGaugeChart();
+            loadConfidenceChart();
+            loadTimelineChart();
+            loadDetectionRateChart();
+            loadFalsePositiveChart();
+            loadDomainsChart();
+            loadLengthChart();
+            loadRecentTable();
+            loadMaliciousTable();
+            
+            // Setup WebSocket
+            setupWebSocket();
+
+            // Auto refresh every 5 minutes
+            setInterval(() => {
+                console.log('🔄 Auto-refreshing data...');
+                loadStats();
+                loadConfidenceChart();
+                loadTimelineChart();
+                loadMaliciousTable();
+            }, 300000);
+            
+            console.log('✅ Dashboard initialized successfully!');
+        });
+    </script>
+</body>
+</html>
